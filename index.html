@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Práctica de Tablas de Multiplicar</title>
+
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { display: ['Fredoka', 'ui-sans-serif', 'system-ui'] },
+          boxShadow: { glow: '0 0 0 4px rgba(59,130,246,0.25)' },
+          colors: {
+            brand: { primary: '#4f46e5' }
+          }
+        }
+      }
+    }
+  </script>
+
+  <meta name="description" content="App de práctica de tablas (1–10) con cuenta atrás, puntos, feedback con imágenes de Giphy, dictado continuo y sonidos."/>
+  <style>
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-b from-sky-100 to-indigo-100 flex items-center justify-center p-4 font-display">
+  <main class="w-full max-w-5xl">
+    <section class="bg-white/90 backdrop-blur rounded-3xl shadow-xl p-6 sm:p-10">
+      <header class="text-center mb-6">
+        <h1 class="text-3xl sm:text-4xl md:text-5xl font-extrabold text-indigo-700 tracking-tight">
+          ¡Practica las Tablas!
+        </h1>
+        <p class="text-indigo-800/80 mt-2 text-lg sm:text-xl">Del 1 al 10 · Cuenta atrás de 15s · Dictado continuo opcional</p>
+      </header>
+
+      <!-- Controles de configuración -->
+      <div class="flex flex-wrap items-center justify-center gap-3 sm:gap-4 mb-5">
+        <button id="btn-mic-permission" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow" title="Conceder permiso de micrófono (recomendado)">
+          🎙️ Activar micrófono
+        </button>
+        <label class="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-indigo-200">
+          <input id="toggle-autodictate" type="checkbox" class="w-5 h-5 accent-indigo-600">
+          <span class="text-indigo-900 font-semibold">Dictado automático</span>
+        </label>
+        <button id="btn-mic" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow" title="Dictar una respuesta puntual">
+          🎤 Dictar una vez
+        </button>
+      </div>
+
+      <!-- Marcadores -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
+        <div class="rounded-2xl bg-green-50 border border-green-200 p-4 text-center">
+          <div class="text-2xl sm:text-3xl font-bold text-green-700" id="score-ok">0</div>
+          <div class="text-sm sm:text-base text-green-700/80">Aciertos</div>
+        </div>
+        <div class="rounded-2xl bg-rose-50 border border-rose-200 p-4 text-center">
+          <div class="text-2xl sm:text-3xl font-bold text-rose-700" id="score-bad">0</div>
+          <div class="text-sm sm:text-base text-rose-700/80">Fallos</div>
+        </div>
+        <div class="rounded-2xl bg-amber-50 border border-amber-200 p-4 text-center">
+          <div class="text-2xl sm:text-3xl font-bold text-amber-700" id="score-total">0</div>
+          <div class="text-sm sm:text-base text-amber-700/80">Intentos (10)</div>
+        </div>
+        <div class="rounded-2xl bg-indigo-50 border border-indigo-200 p-4 text-center">
+          <div class="text-2xl sm:text-3xl font-bold text-indigo-700" id="score-points">0</div>
+          <div class="text-sm sm:text-base text-indigo-700/80">Puntos Totales</div>
+        </div>
+      </div>
+
+      <!-- Panel -->
+      <div class="bg-indigo-50 border border-indigo-200 rounded-2xl p-5 sm:p-7">
+        <div class="flex flex-wrap items-center justify-center gap-4 mb-4">
+          <div class="rounded-xl bg-white border border-indigo-200 px-4 py-2 text-center">
+            <div class="text-sm text-indigo-700/80">Cuenta atrás</div>
+            <div id="timer" class="text-2xl sm:text-3xl font-extrabold text-indigo-800">15s</div>
+          </div>
+          <div class="rounded-xl bg-white border border-indigo-200 px-4 py-2 text-center">
+            <div class="text-sm text-indigo-700/80">Puntos de esta pregunta</div>
+            <div id="question-points" class="text-2xl sm:text-3xl font-extrabold text-indigo-800">1000</div>
+          </div>
+        </div>
+
+        <!-- Operación -->
+        <div class="flex items-center justify-center gap-3 sm:gap-5 mb-5">
+          <span id="n1" class="text-5xl sm:text-6xl font-extrabold text-indigo-800 select-none">3</span>
+          <span class="text-4xl sm:text-5xl font-extrabold text-indigo-600 select-none">×</span>
+          <span id="n2" class="text-5xl sm:text-6xl font-extrabold text-indigo-800 select-none">4</span>
+          <span class="text-4xl sm:text-5xl font-extrabold text-indigo-600 select-none">=</span>
+          <label for="answer" class="sr-only">Tu respuesta</label>
+          <input id="answer" type="number" inputmode="numeric" min="0"
+            class="w-28 sm:w-36 text-center text-4xl sm:text-5xl font-extrabold bg-white rounded-2xl border-2 border-indigo-300 focus:outline-none focus:border-indigo-500 focus:shadow-glow p-2 sm:p-3"
+            placeholder="?" autocomplete="off"/>
+        </div>
+
+        <!-- Botones -->
+        <div class="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+          <button id="btn-check" class="px-5 sm:px-6 py-3 sm:py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-lg sm:text-xl font-bold shadow-lg transition">
+            Comprobar
+          </button>
+          <button id="btn-next" class="px-5 sm:px-6 py-3 sm:py-3.5 rounded-2xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-lg sm:text-xl font-bold shadow-lg transition">
+            Siguiente
+          </button>
+          <button id="btn-reset" class="px-5 sm:px-6 py-3 sm:py-3.5 rounded-2xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-lg sm:text-xl font-bold shadow-lg transition">
+            Reiniciar marcadores
+          </button>
+        </div>
+
+        <!-- Feedback -->
+        <div class="mt-5 text-center min-h-[3.5rem]">
+          <p id="feedback" class="text-xl sm:text-2xl font-bold text-indigo-900" aria-live="polite"></p>
+          <div id="feedback-img" class="mt-3 flex items-center justify-center"></div>
+        </div>
+      </div>
+
+      <p class="text-center text-indigo-900/70 mt-4 text-sm">
+        Tip: Enter = comprobar · N = siguiente · Activa el dictado continuo para no tocar botones.
+      </p>
+    </section>
+  </main>
+
+  <!-- Overlay final -->
+  <div id="final-overlay" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl p-8 sm:p-12 text-center max-w-2xl w-full">
+      <h2 class="text-3xl sm:text-5xl font-extrabold text-indigo-700 mb-4">¡Resultados!</h2>
+      <p id="final-stats" class="text-xl sm:text-2xl text-indigo-900 mb-6"></p>
+      <button id="btn-restart" class="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-lg font-bold shadow-lg">
+        Jugar de nuevo
+      </button>
+    </div>
+  </div>
+
+  <canvas id="confetti" class="fixed inset-0 pointer-events-none"></canvas>
+
+  <script>
+    // ======= Referencias =======
+    const n1El = document.getElementById('n1');
+    const n2El = document.getElementById('n2');
+    const ansEl = document.getElementById('answer');
+    const feedbackEl = document.getElementById('feedback');
+    const feedbackImgEl = document.getElementById('feedback-img');
+    const okEl = document.getElementById('score-ok');
+    const badEl = document.getElementById('score-bad');
+    const totalEl = document.getElementById('score-total');
+    const pointsEl = document.getElementById('score-points');
+    const qPointsEl = document.getElementById('question-points');
+    const timerEl = document.getElementById('timer');
+    const btnCheck = document.getElementById('btn-check');
+    const btnNext = document.getElementById('btn-next');
+    const btnReset = document.getElementById('btn-reset');
+    const btnMic = document.getElementById('btn-mic');
+    const btnMicPermission = document.getElementById('btn-mic-permission');
+    const toggleAutoDictate = document.getElementById('toggle-autodictate');
+    const finalOverlay = document.getElementById('final-overlay');
+    const finalStats = document.getElementById('final-stats');
+    const btnRestart = document.getElementById('btn-restart');
+
+    // ======= Estado =======
+    let currentAnswer = 0;
+    let ok = 0, bad = 0, total = 0;
+    let totalPoints = 0;
+    const QUESTION_TIME_MS = 15000;
+    const MAX_Q_POINTS = 1000;
+    let qStartTs = null;
+    let rafId = null;
+    let lockInput = false;
+    let lastWholeSec = null;
+
+    // Mic & dictado
+    let recognition = null;
+    let autoDictate = localStorage.getItem('autoDictate') === 'true';
+    toggleAutoDictate.checked = autoDictate;
+
+    // ======= Giphy =======
+    const GIPHY_API_KEY = "dMzZAmeg2QP5yBTHlRr8sqKyJBHjCwrI";
+    const GIPHY_SEARCH = "https://api.giphy.com/v1/gifs/search";
+
+    // ======= Util =======
+    const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+    function updateScoreboard(){ okEl.textContent=ok; badEl.textContent=bad; totalEl.textContent=total; pointsEl.textContent=totalPoints; }
+    function formatSeconds(msLeft){ const s=Math.ceil(msLeft/1000); return Math.max(0,s)+'s'; }
+    function currentQuestionPoints(){
+      if(!qStartTs) return MAX_Q_POINTS;
+      const elapsed = performance.now()-qStartTs;
+      const ratio = Math.min(Math.max(elapsed/QUESTION_TIME_MS,0),1);
+      return Math.max(0, Math.round(MAX_Q_POINTS*(1-ratio)));
+    }
+    function setFeedback(msg, type='info'){
+      const map={success:'text-green-700', error:'text-rose-700', info:'text-indigo-900'};
+      feedbackEl.className='text-xl sm:text-2xl font-bold '+map[type];
+      feedbackEl.textContent = msg||'';
+    }
+
+    // ======= GIFs aleatorios =======
+    async function showGif(type){
+      feedbackImgEl.innerHTML = '';
+      let q, fallback;
+      if(type==='success'){
+        q = 'Oliver y Benji Captain Tsubasa goal';
+        fallback = 'https://media.giphy.com/media/3o6Zt6ML6BklcajjsA/giphy.gif';
+      }else{
+        q = ['fail','epic fail','oops error','mistake','game over'][randInt(0,4)];
+        fallback = 'https://media.giphy.com/media/26gR1oG9KRGbQqG3m/giphy.gif';
+      }
+      try{
+        // Pide varios resultados y escoge uno al azar
+        const url = `${GIPHY_SEARCH}?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(q)}&limit=25&rating=g&lang=es`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const list = data?.data || [];
+        const pick = list.length ? list[randInt(0, list.length-1)] : null;
+        const src = pick ? (pick.images?.downsized_medium?.url || pick.images?.original?.url) : fallback;
+        const img = document.createElement('img');
+        img.src = src;
+        img.alt = type==='success' ? 'GIF de Oliver y Benji (Giphy)' : 'GIF de fail (Giphy)';
+        img.referrerPolicy = 'no-referrer';
+        img.loading = 'lazy';
+        img.className = 'mx-auto max-w-full rounded-2xl shadow';
+        feedbackImgEl.appendChild(img);
+      }catch(e){
+        const img = document.createElement('img');
+        img.src = fallback;
+        img.alt = 'GIF';
+        img.className = 'mx-auto max-w-full rounded-2xl shadow';
+        feedbackImgEl.appendChild(img);
+      }
+    }
+
+    function clearImage(){ feedbackImgEl.innerHTML=''; }
+
+    // ======= Sonidos modernos (WebAudio) =======
+    let audioCtx = null, master = null, delay = null, comp = null;
+    function ensureAudio(){
+      if(audioCtx) return;
+      try{
+        audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+        comp = audioCtx.createDynamicsCompressor();
+        comp.threshold.value = -18; comp.knee.value = 24; comp.ratio.value = 8;
+        comp.attack.value = 0.003; comp.release.value = 0.250;
+
+        delay = audioCtx.createDelay();
+        delay.delayTime.value = 0.18;
+        const fb = audioCtx.createGain(); fb.gain.value = 0.28;
+        delay.connect(fb).connect(delay);
+
+        master = audioCtx.createGain();
+        master.gain.value = 0.9;
+        // cadena: fuente -> delay (+fb) -> comp -> destino
+        delay.connect(comp);
+        comp.connect(audioCtx.destination);
+        master.connect(delay);
+      }catch{}
+    }
+    function envGain(time, g){
+      const now = time;
+      g.gain.cancelScheduledValues(now);
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(0.8, now+0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, now+0.35);
+    }
+    function makeOsc(freq, type='sine', start=0, dur=0.4, dest=master){
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = type; o.frequency.value = freq;
+      o.connect(g).connect(dest);
+      const t = audioCtx.currentTime + start;
+      envGain(t, g);
+      o.start(t);
+      o.stop(t+dur+0.02);
+    }
+    function successSound(){
+      ensureAudio();
+      if(!audioCtx) return;
+      // Arpegio EDM corto con acorde mayor (I–V–VI) + brillo y sub
+      const base = randInt(440, 520); // tono variable para frescura
+      makeOsc(base, 'triangle', 0.00, 0.35);
+      makeOsc(base*1.5, 'sawtooth', 0.00, 0.35); // quinta
+      makeOsc(base*1.26, 'square', 0.00, 0.35);  // tercia mayor (aprox)
+
+      makeOsc(base*2, 'triangle', 0.12, 0.32);
+      makeOsc(base*3, 'sawtooth', 0.12, 0.32);
+
+      makeOsc(base*2.52, 'square', 0.24, 0.30);
+      makeOsc(base*1, 'sine', 0.24, 0.30); // sub refuerzo
+    }
+    function failSound(){
+      ensureAudio();
+      if(!audioCtx) return;
+      // Sirena descendente con distorsión suave
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      const shaper = audioCtx.createWaveShaper();
+      // curva leve de distorsión
+      const curve = new Float32Array(256);
+      for (let i=0;i<256;i++){ const x=i/255*2-1; curve[i]=Math.tanh(3*x); }
+      shaper.curve = curve; shaper.oversample='4x';
+
+      o.type = 'sawtooth';
+      o.connect(shaper).connect(g).connect(master);
+      const now = audioCtx.currentTime;
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(0.9, now+0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, now+0.45);
+      o.frequency.setValueAtTime(520, now);
+      o.frequency.exponentialRampToValueAtTime(120, now+0.45);
+      o.start(now);
+      o.stop(now+0.47);
+    }
+
+    // ======= Lógica =======
+    let qTimerCriticalState = 'normal'; // normal, warn, danger
+    function newProblem(){
+      stopTick();
+      lockInput=false; clearImage(); setFeedback(''); ansEl.value='';
+      const a=randInt(1,10), b=randInt(1,10);
+      n1El.textContent=a; n2El.textContent=b;
+      currentAnswer = a*b;
+      qStartTs = performance.now(); lastWholeSec=null;
+      qPointsEl.textContent = MAX_Q_POINTS;
+      timerEl.textContent = formatSeconds(QUESTION_TIME_MS);
+      qTimerCriticalState = 'normal';
+      timerEl.classList.remove('text-amber-600','text-red-600');
+      timerEl.classList.add('text-indigo-800');
+      startTick();
+      ansEl.focus();
+
+      // Si dictado automático, arrancar escucha
+      if(recognition && autoDictate){
+        safeStartRecognition();
+      }
+    }
+
+    function evaluateAnswer(userVal, dueToTimeout=false){
+      stopTick();
+      total++;
+      const qPoints = dueToTimeout ? 0 : currentQuestionPoints();
+      const correct = (userVal === currentAnswer) && !dueToTimeout;
+
+      if(correct){
+        ok++; totalPoints += qPoints;
+        setFeedback(`¡Correcto! +${qPoints} puntos 🎉`, 'success');
+        showGif('success'); successSound(); triggerConfetti(140);
+      }else{
+        bad++;
+        setFeedback(`Ups… ${dueToTimeout ? '¡Tiempo agotado!' : 'Incorrecto.'} Era ${currentAnswer}.`, 'error');
+        showGif('fail'); failSound();
+      }
+      updateScoreboard();
+
+      // Pausar dictado entre preguntas si no es automático
+      if(recognition && !autoDictate) {
+        try{ recognition.stop(); }catch{}
+      }
+
+      lockInput=true;
+      btnCheck.disabled = true; btnNext.disabled=true; ansEl.disabled=true; btnMic.disabled=true; btnMicPermission.disabled=true;
+
+      setTimeout(()=>{
+        clearImage();
+        if(total>=10){ showFinal(); }
+        else{
+          btnCheck.disabled=false; btnNext.disabled=false; ansEl.disabled=false; btnMic.disabled=false; btnMicPermission.disabled=false;
+          newProblem();
+        }
+      }, 2500);
+    }
+
+    // ======= Cuenta atrás =======
+    function tick(){
+      const now = performance.now();
+      const elapsed = now - qStartTs;
+      const remaining = Math.max(0, QUESTION_TIME_MS - elapsed);
+      const whole = Math.ceil(remaining/1000);
+      if(whole !== lastWholeSec){
+        timerEl.textContent = Math.max(0, whole)+'s';
+        lastWholeSec = whole;
+        // Cambio de color últimos segundos
+        if(whole <= 5 && qTimerCriticalState==='normal'){
+          timerEl.classList.remove('text-indigo-800');
+          timerEl.classList.add('text-amber-600');
+          qTimerCriticalState='warn';
+        }
+        if(whole <= 3 && qTimerCriticalState!=='danger'){
+          timerEl.classList.remove('text-amber-600');
+          timerEl.classList.add('text-red-600');
+          qTimerCriticalState='danger';
+        }
+      }
+      qPointsEl.textContent = currentQuestionPoints();
+      document.title = `⏳ ${timerEl.textContent} · Puntos ${qPointsEl.textContent}`;
+
+      if(remaining<=0){
+        cancelAnimationFrame(rafId); rafId=null;
+        evaluateAnswer(null, true); return;
+      }
+      rafId = requestAnimationFrame(tick);
+    }
+    function startTick(){ if(rafId) cancelAnimationFrame(rafId); rafId=requestAnimationFrame(tick); }
+    function stopTick(){ if(rafId) cancelAnimationFrame(rafId); rafId=null; document.title='Práctica de Tablas de Multiplicar'; }
+
+    // ======= Final =======
+    function showFinal(){
+      finalStats.innerHTML = `
+        <span class="block text-2xl sm:text-3xl mb-2">Intentos: <b>${total}</b></span>
+        <span class="block text-2xl sm:text-3xl mb-2 text-green-700">Aciertos: <b>${ok}</b></span>
+        <span class="block text-2xl sm:text-3xl mb-2 text-rose-700">Fallos: <b>${bad}</b></span>
+        <span class="block text-3xl sm:text-4xl mt-2">Puntuación total: <b>${totalPoints}</b> ⭐</span>`;
+      finalOverlay.classList.remove('hidden'); finalOverlay.classList.add('flex');
+      triggerConfetti(160);
+    }
+    function resetAll(){
+      stopTick(); currentAnswer=0; ok=0; bad=0; total=0; totalPoints=0;
+      updateScoreboard(); finalOverlay.classList.add('hidden'); finalOverlay.classList.remove('flex');
+      btnCheck.disabled=false; btnNext.disabled=false; ansEl.disabled=false; btnMic.disabled=false; btnMicPermission.disabled=false;
+      newProblem();
+    }
+
+    // ======= Eventos UI =======
+    btnCheck.addEventListener('click', ()=>{
+      if(lockInput) return;
+      const v = parseInt(ansEl.value,10);
+      if(Number.isNaN(v)){ setFeedback('Escribe o dicta un número ☝️', 'info'); return; }
+      evaluateAnswer(v);
+    });
+    btnNext.addEventListener('click', ()=>{ if(lockInput) return; evaluateAnswer(null, true); });
+    btnReset.addEventListener('click', resetAll);
+    btnRestart.addEventListener('click', resetAll);
+    ansEl.addEventListener('keydown', (e)=>{
+      if(e.key==='Enter' && !lockInput){
+        const v = parseInt(ansEl.value,10);
+        if(!Number.isNaN(v)) evaluateAnswer(v); else setFeedback('Escribe o dicta un número ☝️', 'info');
+      }
+    });
+    document.addEventListener('keydown', (e)=>{ if(e.key.toLowerCase()==='n' && !lockInput) evaluateAnswer(null, true); });
+
+    // ======= Mic / Dictado =======
+    function hasSecureContext(){ return location.protocol === 'https:' || location.hostname === 'localhost'; }
+
+    async function askMicPermission(){
+      // Pedir permiso explícito (mejor en contexto de usuario)
+      if(!navigator.mediaDevices?.getUserMedia){
+        setFeedback('Tu navegador no soporta getUserMedia para el micrófono.', 'error');
+        return false;
+      }
+      try{
+        await navigator.mediaDevices.getUserMedia({audio:true});
+        localStorage.setItem('micGranted','true');
+        setFeedback('Micrófono listo ✅', 'success');
+        return true;
+      }catch(e){
+        setFeedback('No se pudo acceder al micrófono. Revisa los permisos del navegador.', 'error');
+        return false;
+      }
+    }
+
+    async function checkPermissionState(){
+      if(!navigator.permissions?.query) return null;
+      try{
+        const status = await navigator.permissions.query({name:'microphone'});
+        return status.state; // 'granted' | 'denied' | 'prompt'
+      }catch{ return null; }
+    }
+
+    btnMicPermission.addEventListener('click', async ()=>{
+      if(!hasSecureContext()){
+        setFeedback('Para usar el micrófono, abre este archivo con HTTPS (o en localhost).', 'error');
+        return;
+      }
+      const ok = await askMicPermission();
+      if(ok){ initSpeechIfNeeded(); }
+    });
+
+    // Dicado una vez
+    btnMic.addEventListener('click', ()=>{
+      if(lockInput) return;
+      if(!recognition){ initSpeechIfNeeded(); }
+      if(recognition){ singleShotRecognition(); }
+    });
+
+    function singleShotRecognition(){
+      if(!recognition) return;
+      recognition.continuous = false;
+      safeStartRecognition();
+    }
+
+    function safeStartRecognition(){
+      try{ recognition.start(); }catch{ /* ya estaba activo */ }
+    }
+
+    function initSpeechIfNeeded(){
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if(!SR){ setFeedback('Tu navegador no soporta Web Speech API.', 'error'); return; }
+      if(recognition) return;
+      recognition = new SR();
+      recognition.lang='es-ES';
+      recognition.interimResults=false;
+      recognition.maxAlternatives=1;
+      recognition.continuous = true; // clave para auto dictado
+
+      recognition.addEventListener('result', (event)=>{
+        const transcript = event.results[event.results.length-1][0].transcript || '';
+        const match = transcript.replace(',', '.').match(/-?\d+/);
+        if(match){
+          ansEl.value = parseInt(match[0], 10);
+          setFeedback('Dictado: "'+transcript+'" → '+ansEl.value, 'info');
+        }else{
+          setFeedback('No he entendido un número. Prueba otra vez 😊', 'info');
+        }
+      });
+      recognition.addEventListener('error', (e)=>{
+        // Muchos navegadores lanzan "no-speech" de forma esporádica
+        if(e.error!=='no-speech'){
+          setFeedback('Error de dictado: '+e.error, 'error');
+        }
+      });
+      recognition.addEventListener('end', ()=>{
+        // Reiniciar automáticamente si el modo auto está activado y no estamos bloqueados
+        if(autoDictate && !lockInput){
+          setTimeout(()=> safeStartRecognition(), 120);
+        }
+      });
+    }
+
+    // Persistencia del toggle
+    toggleAutoDictate.addEventListener('change', async (e)=>{
+      autoDictate = e.target.checked;
+      localStorage.setItem('autoDictate', autoDictate ? 'true' : 'false');
+      if(autoDictate){
+        if(!hasSecureContext()){
+          setFeedback('Para dictado automático, usa HTTPS o localhost.', 'error');
+          toggleAutoDictate.checked = false;
+          localStorage.setItem('autoDictate','false');
+          return;
+        }
+        // Garantizar permiso e iniciar
+        const state = await checkPermissionState();
+        if(state !== 'granted' && localStorage.getItem('micGranted')!=='true'){
+          const ok = await askMicPermission();
+          if(!ok){
+            toggleAutoDictate.checked = false;
+            localStorage.setItem('autoDictate','false');
+            return;
+          }
+        }
+        initSpeechIfNeeded();
+        safeStartRecognition();
+      }else{
+        try{ recognition && recognition.stop(); }catch{}
+      }
+    });
+
+    // ======= Confeti =======
+    const canvas = document.getElementById('confetti');
+    const ctx = canvas.getContext('2d');
+    let confettiPieces = [];
+    function resizeCanvas(){ canvas.width=window.innerWidth; canvas.height=window.innerHeight; }
+    window.addEventListener('resize', resizeCanvas); resizeCanvas();
+    function triggerConfetti(count=90){
+      confettiPieces=[];
+      for(let i=0;i<count;i++){
+        confettiPieces.push({x:Math.random()*canvas.width,y:-10-Math.random()*100,size:4+Math.random()*6,vy:2+Math.random()*3,vx:(Math.random()-0.5)*2,rot:Math.random()*Math.PI,vr:(Math.random()-0.5)*0.2});
+      }
+      animateConfetti(); setTimeout(()=> confettiPieces=[], 1200);
+    }
+    function animateConfetti(){
+      if(confettiPieces.length===0) return;
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      for(const p of confettiPieces){ p.y+=p.vy; p.x+=p.vx; p.rot+=p.vr; drawPiece(p); }
+      requestAnimationFrame(animateConfetti);
+    }
+    function drawPiece(p){
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot);
+      const colors=['#4f46e5','#0ea5e9','#22c55e','#f59e0b','#ef4444','#a855f7'];
+      ctx.fillStyle = colors[(Math.floor(p.x+p.y)%colors.length+colors.length)%colors.length];
+      ctx.fillRect(-p.size/2,-p.size/2,p.size,p.size); ctx.restore();
+    }
+
+    // ======= Inicio =======
+    (async function boot(){
+      updateScoreboard();
+      // Intento de detección de permiso ya concedido para inicializar voz sin fricción
+      if(hasSecureContext()){
+        const state = await checkPermissionState();
+        if(state === 'granted' || localStorage.getItem('micGranted')==='true'){
+          initSpeechIfNeeded();
+          if(autoDictate){ safeStartRecognition(); }
+        }
+      }
+      newProblem();
+    })();
+  </script>
+</body>
+</html>
